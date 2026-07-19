@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>NikAI</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css">
+
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+
+
+</head>
+
+
+<body>
+
+
+<div class="app">
+
+
+    <!-- Sidebar -->
+
+    <div class="sidebar">
+
+
+        <h2>
+            🤖 NikAI
+        </h2>
+
+
+
+        <button id="newChat">
+            + New Chat
+        </button>
+
+
+
+
+        <div class="history" id="chat-history">
+
+
+        </div>
+
+
+
+    </div>
+
+
+
+
+
+    <!-- Main Chat Area -->
+
+
+    <div class="main">
+
+
+
+        <h1 id="chat-title">
+            NikAI
+        </h1>
+
+
+
+
+        <div id="chat-box">
+
+
+            <div class="bot-message">
+
+                👋 Hello! I am NikAI. How can I help you today?
+
+            </div>
+
+
+
+        </div>
+
+
+
+
+
+        <!-- PDF Upload -->
+
+
+        <div class="pdf-area">
+
+
+            <input
+                type="file"
+                id="pdfFile"
+                accept=".pdf"
+            >
+
+
+
+            <button id="uploadPdf">
+
+                📎 Upload PDF
+
+            </button>
+
+
+
+        </div>
+
+
+
+
+
+
+
+
+        <!-- Input Area -->
+
+
+        <div class="input-area">
+
+
+            <input
+
+                id="userInput"
+
+                type="text"
+
+                placeholder="Message NikAI..."
+
+            >
+
+
+
+
+
+            <button id="micBtn">
+
+                🎙️
+
+            </button>
+
+
+
+
+
+            <button id="sendBtn">
+
+                Send
+
+            </button>
+
+
+
+        </div>
+
+
+
+
+
+    </div>
+
+
+
+
+</div>
+
+
+
+
+
+<script src="script.js"></script>
+
+
+
+</body>
+
+
+</html>
