@@ -424,7 +424,7 @@ async function sendMessage(fromVoice = false) {
 
         const response =
             await fetch(
-                "/chat",
+                "https://nikai-wxyv.onrender.com/chat",
                 {
                     method: "POST",
 
@@ -1092,7 +1092,7 @@ uploadPdf.addEventListener(
 
             const response =
                 await fetch(
-                    "/upload-pdf",
+                    "https://nikai-wxyv.onrender.com/upload-pdf",
                     {
                         method: "POST",
                         body: formData
