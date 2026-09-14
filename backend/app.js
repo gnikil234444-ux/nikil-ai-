@@ -1,5 +1,4 @@
 require("dotenv").config();
-console.log("MY KEY:", process.env.GEMINI_API_KEY);
 
 const express = require("express");
 const path = require("path");
@@ -8,158 +7,245 @@ const multer = require("multer");
 const { askNikAI } = require("./services/ai");
 const { readPDF } = require("./services/pdf");
 const { splitText } = require("./services/chunk");
-const { addMemory, searchMemory } = require("./services/memory");
+
+const {
+    addMemory,
+    addChatMemory,
+    searchMemory
+} = require("./services/memory");
 
 const app = express();
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "../frontend")));
 
-// Store uploaded PDFs
-let pdfMemory = [];
+/* =========================
+   FRONTEND
+========================= */
 
-// PDF upload setup
+app.use(
+    express.static(
+        path.join(__dirname, "../frontend")
+    )
+);
+
+/* =========================
+   FILE UPLOAD
+========================= */
+
 const upload = multer({
     storage: multer.memoryStorage()
 });
 
-// Home page
+/* =========================
+   HOME PAGE
+========================= */
+
 app.get("/", (req, res) => {
     res.sendFile(
-        path.join(__dirname, "../frontend/index.html")
+        path.join(
+            __dirname,
+            "../frontend/index.html"
+        )
     );
 });
 
-// Upload PDF + Embedding Memory
-app.post("/upload-pdf", upload.single("pdf"), async (req, res) => {
+/* =========================
+   PDF UPLOAD
+========================= */
 
-    try {
+app.post(
+    "/upload-pdf",
+    upload.single("pdf"),
+    async (req, res) => {
+        try {
+            if (!req.file) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Please upload a PDF."
+                });
+            }
 
-        if (!req.file) {
-            return res.json({
+            console.log(
+                "📄 Reading PDF:",
+                req.file.originalname
+            );
+
+            const text = await readPDF(
+                req.file.buffer
+            );
+
+            const chunks = splitText(text);
+
+            await addMemory(
+                req.file.originalname,
+                chunks
+            );
+
+            console.log(
+                "✅ PDF learned:",
+                req.file.originalname
+            );
+
+            res.json({
+                success: true,
+                filename: req.file.originalname,
+                message: "PDF uploaded and learned."
+            });
+
+        } catch (error) {
+            console.error(
+                "❌ PDF Error:",
+                error
+            );
+
+            res.status(500).json({
                 success: false,
-                message: "No PDF uploaded."
+                message: "Could not read PDF."
             });
         }
+    }
+);
 
-        const text = await readPDF(req.file.buffer);
+/* =========================
+   CHAT
+========================= */
 
-        // Split PDF into chunks
-        const chunks = splitText(text);
+app.post(
+    "/chat",
+    async (req, res) => {
+        try {
+            const {
+                message,
+                chatId
+            } = req.body;
 
-        // Create embeddings and store memory
-        await addMemory(
-            req.file.originalname,
-            chunks
+            if (!message || !message.trim()) {
+                return res.json({
+                    reply: "Please type a message."
+                });
+            }
+
+            console.log(
+                "👤 User:",
+                message
+            );
+
+            /*
+             * Search permanent memory
+             */
+            const results =
+                await searchMemory(message);
+
+            let prompt = message;
+
+            /*
+             * Add relevant memories
+             */
+            if (results.length > 0) {
+
+                let context = "";
+
+                for (const item of results) {
+
+                    if (item.type === "pdf") {
+
+                        context +=
+                            "\nPDF DOCUMENT: " +
+                            item.filename +
+                            "\nCONTENT:\n" +
+                            item.text +
+                            "\n";
+
+                    } else {
+
+                        context +=
+                            "\nPREVIOUS MEMORY:\n" +
+                            item.text +
+                            "\n";
+                    }
+                }
+
+                prompt =
+                    "You are NikAI.\n\n" +
+
+                    "Use the saved information below " +
+                    "ONLY when it is relevant to the " +
+                    "user's current question.\n\n" +
+
+                    "Do NOT mention unrelated memories.\n" +
+                    "Do NOT randomly tell the user what " +
+                    "you remember about them.\n\n" +
+
+                    "SAVED INFORMATION:\n" +
+                    context +
+
+                    "\nCURRENT USER MESSAGE:\n" +
+                    message +
+
+                    "\n\nIMPORTANT RULES:\n" +
+                    "- Use relevant information when helpful.\n" +
+                    "- Ignore unrelated information.\n" +
+                    "- Do not invent memories.\n" +
+                    "- Answer the user's actual question.\n" +
+                    "- Be clear, helpful and natural.";
+            }
+
+            /*
+             * Ask NikAI using the current chat ID
+             */
+            const reply =
+                await askNikAI(
+                    prompt,
+                    chatId
+                );
+
+            console.log(
+                "🤖 NikAI:",
+                reply
+            );
+
+            /*
+             * Save conversation permanently
+             */
+            await addChatMemory(
+                "User: " +
+                message +
+                "\nNikAI: " +
+                reply
+            );
+
+            res.json({
+                reply: reply
+            });
+
+        } catch (error) {
+
+            console.error(
+                "❌ NikAI Error:",
+                error
+            );
+
+            res.status(500).json({
+                reply:
+                    "❌ Sorry, I couldn't contact NikAI right now."
+            });
+        }
+    }
+);
+
+/* =========================
+   SERVER
+========================= */
+
+const PORT =
+    process.env.PORT || 3000;
+
+app.listen(
+    PORT,
+    () => {
+        console.log(
+            "🤖 NikAI running on port " +
+            PORT
         );
-
-        // Keep PDF record
-        pdfMemory.push({
-            name: req.file.originalname,
-            content: text
-        });
-
-        res.json({
-            success: true,
-            filename: req.file.originalname,
-            message: "PDF uploaded and learned."
-        });
-
-    } catch (error) {
-
-        console.error("PDF Error:", error);
-
-        res.status(500).json({
-            success: false,
-            message: "Could not read PDF."
-        });
-
     }
-
-});
-
-// NikAI Chat with Embedding Search
-app.post("/chat", async (req, res) => {
-
-    try {
-
-        const { message } = req.body;
-
-        if (!message) {
-            return res.json({
-                reply: "Please type a message."
-            });
-        }
-
-        let prompt = message;
-
-        // Search using AI meaning
-        const results = await searchMemory(message);
-
-        if (results.length > 0) {
-
-            let context = results.map((item) => {
-
-                return `
-
-DOCUMENT:
-
-${item.filename}
-
-CONTENT:
-
-${item.text}
-
-`;
-
-            }).join("\n\n");
-
-            prompt = `
-
-You are NikAI.
-
-Answer the user's question using the document information below.
-
-DOCUMENT INFORMATION:
-
-${context}
-
-USER QUESTION:
-
-${message}
-
-Rules:
-
-- Use the document information when possible.
-- Do not invent answers.
-- If the answer is not found, say:
-"I could not find that information in the uploaded documents."
-
-`;
-
-        }
-
-        const reply = await askNikAI(prompt);
-
-        res.json({
-            reply
-        });
-
-    } catch (error) {
-
-        console.error("NikAI Error:", error);
-
-        res.status(500).json({
-            reply: "❌ Sorry, I couldn't contact NikAI right now."
-        });
-
-    }
-
-});
-
-// Render-compatible port
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-    console.log(`🤖 NikAI running on port ${PORT}`);
-});
+);

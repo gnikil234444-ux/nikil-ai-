@@ -1,882 +1,1177 @@
+// ===============================
+// NikAI FRONTEND
+// ===============================
+
+let currentChatId = "chat-" + Date.now();
+
+let chats = {};
+let titles = {};
+
+let recognition = null;
+
+let voiceMode = false;
+let listening = false;
+let speaking = false;
+
+
+// ===============================
+// ELEMENTS
+// ===============================
+
 const chatBox = document.getElementById("chat-box");
 const userInput = document.getElementById("userInput");
 const sendBtn = document.getElementById("sendBtn");
-const newChatBtn = document.getElementById("newChat");
 const micBtn = document.getElementById("micBtn");
-
-const pdfFile = document.getElementById("pdfFile");
-const uploadPdfBtn = document.getElementById("uploadPdf");
-
-const chatTitle = document.getElementById("chat-title");
+const newChatBtn = document.getElementById("newChat");
 const chatHistory = document.getElementById("chat-history");
+const chatTitle = document.getElementById("chat-title");
+const pdfFile = document.getElementById("pdfFile");
+const uploadPdf = document.getElementById("uploadPdf");
 
 
+// ===============================
+// STATUS MESSAGE
+// ===============================
 
-let messages = JSON.parse(localStorage.getItem("nikaiChat")) || [];
+const status = document.createElement("div");
 
-let chatTitles = JSON.parse(localStorage.getItem("nikaiTitles")) || [];
+status.style.position = "fixed";
+status.style.bottom = "90px";
+status.style.left = "50%";
+status.style.transform = "translateX(-50%)";
+status.style.padding = "10px 18px";
+status.style.borderRadius = "12px";
+status.style.background = "#222";
+status.style.color = "white";
+status.style.fontSize = "14px";
+status.style.zIndex = "9999";
+status.style.display = "none";
 
-let currentTitle = localStorage.getItem("nikaiCurrentTitle") || "NikAI";
+document.body.appendChild(status);
 
 
+function showStatus(message) {
+
+    status.textContent = message;
+    status.style.display = "block";
+
+    setTimeout(() => {
+        status.style.display = "none";
+    }, 2500);
+}
 
 
+// ===============================
+// LOAD SAVED CHATS
+// ===============================
 
-function saveChat(){
+try {
+
+    chats =
+        JSON.parse(
+            localStorage.getItem("nikaiChat") || "{}"
+        );
+
+    titles =
+        JSON.parse(
+            localStorage.getItem("nikaiTitles") || "{}"
+        );
+
+} catch {
+
+    chats = {};
+    titles = {};
+
+}
+
+
+// ===============================
+// SAVE CHATS
+// ===============================
+
+function saveChats() {
 
     localStorage.setItem(
         "nikaiChat",
-        JSON.stringify(messages)
+        JSON.stringify(chats)
     );
-
-}
-
-
-
-
-
-function saveTitles(){
 
     localStorage.setItem(
         "nikaiTitles",
-        JSON.stringify(chatTitles)
+        JSON.stringify(titles)
     );
-
 }
 
 
+// ===============================
+// DISPLAY MESSAGE
+// ===============================
 
+function addMessage(text, sender) {
 
+    const message = document.createElement("div");
 
-function updateTitle(title){
+    message.className =
+        sender === "user"
+            ? "message user-message"
+            : "message bot-message";
 
-    currentTitle = title;
+    if (sender === "bot" && typeof marked !== "undefined") {
 
-    chatTitle.textContent = title;
+        message.innerHTML =
+            marked.parse(text);
 
-    localStorage.setItem(
-        "nikaiCurrentTitle",
-        title
-    );
+    } else {
 
-
-}
-
-
-
-
-
-
-
-function generateTitle(text){
-
-
-    let title = text
-        .replace(/[^\w\s]/gi,"")
-        .split(" ")
-        .slice(0,4)
-        .join(" ");
-
-
-    if(title.length > 25){
-
-        title = title.substring(0,25) + "...";
+        message.textContent = text;
 
     }
 
+    chatBox.appendChild(message);
 
-
-    return title || "New Chat";
-
-
+    chatBox.scrollTop =
+        chatBox.scrollHeight;
 }
 
 
+// ===============================
+// CREATE CHAT
+// ===============================
 
+function createNewChat() {
 
+    currentChatId =
+        "chat-" + Date.now();
 
+    chats[currentChatId] = [
+        {
+            sender: "bot",
+            text: "Hello! I am NikAI. How can I help you?"
+        }
+    ];
 
+    titles[currentChatId] = "New Chat";
 
+    saveChats();
 
+    renderChat();
 
-function addToHistory(title){
-
-
-    const item = document.createElement("p");
-
-
-    item.innerHTML = "💬 " + title;
-
-
-
-    chatHistory.prepend(item);
-
-
+    renderHistory();
 }
 
 
+// ===============================
+// RENDER CURRENT CHAT
+// ===============================
+
+function renderChat() {
+
+    chatBox.innerHTML = "";
+
+    const messages =
+        chats[currentChatId] || [];
+
+    for (const message of messages) {
+
+        addMessage(
+            message.text,
+            message.sender
+        );
+
+    }
+
+    chatTitle.textContent =
+        titles[currentChatId] || "NikAI";
+}
 
 
+// ===============================
+// RENDER CHAT HISTORY
+// ===============================
 
-
-
-function loadHistory(){
-
+function renderHistory() {
 
     chatHistory.innerHTML = "";
 
+    for (const id in chats) {
 
-    chatTitles.forEach(title=>{
+        const item =
+            document.createElement("div");
 
+        item.className = "history-item";
 
-        addToHistory(title);
+        item.textContent =
+            titles[id] || "New Chat";
 
+        item.onclick = () => {
 
-    });
+            currentChatId = id;
 
-
-}
-
-
-
-
-
-function createMessage(text, sender){
-
-
-    const row = document.createElement("div");
-
-
-    row.className =
-        sender === "user"
-        ? "user-row"
-        : "bot-row";
-
-
-
-
-
-    const avatar = document.createElement("div");
-
-
-    avatar.className = "avatar";
-
-
-    avatar.textContent =
-        sender === "user"
-        ? "👤"
-        : "🤖";
-
-
-
-
-
-
-    const bubble = document.createElement("div");
-
-
-
-    bubble.className =
-        sender === "user"
-        ? "user-message"
-        : "bot-message";
-
-
-
-
-
-
-
-    if(sender === "bot"){
-
-
-        bubble.innerHTML = marked.parse(text);
-
-
-
-        bubble.querySelectorAll("pre code")
-        .forEach((block)=>{
-
-
-            hljs.highlightElement(block);
-
-
-        });
-
-
-
-
-
-
-        const copyBtn = document.createElement("button");
-
-
-        copyBtn.className="copy-btn";
-
-
-        copyBtn.textContent="📑 Copy";
-
-
-
-
-        copyBtn.onclick = async()=>{
-
-
-            await navigator.clipboard.writeText(text);
-
-
-            copyBtn.textContent="✔️ Copied!";
-
-
-            setTimeout(()=>{
-
-
-                copyBtn.textContent="📑 Copy";
-
-
-            },2000);
-
-
+            renderChat();
 
         };
 
+        chatHistory.appendChild(item);
+    }
+}
 
 
-        bubble.appendChild(copyBtn);
+// ===============================
+// SAVE MESSAGE
+// ===============================
 
+function saveMessage(sender, text) {
 
+    if (!chats[currentChatId]) {
+
+        chats[currentChatId] = [];
 
     }
 
-    else{
+    chats[currentChatId].push({
+        sender,
+        text
+    });
+
+    saveChats();
+}
 
 
-        bubble.textContent=text;
+// ===============================
+// IMAGE REQUEST DETECTOR
+// ===============================
+
+function isImageRequest(text) {
+
+    const lower =
+        text.toLowerCase();
+
+    return (
+        lower.includes("generate an image") ||
+        lower.includes("create an image") ||
+        lower.includes("make an image") ||
+        lower.includes("draw an image") ||
+        lower.includes("generate a picture") ||
+        lower.includes("create a picture") ||
+        lower.startsWith("draw ")
+    );
+}
 
 
-    }
+// ===============================
+// BETTER IMAGE PROMPT
+// ===============================
+
+function buildImagePrompt(idea) {
+
+    return `
+Create a high-quality detailed image based exactly on this request:
+
+${idea}
+
+IMPORTANT:
+
+- Follow the user's description precisely.
+- Make the requested subject the main focus.
+- Do not add unrelated objects.
+- Keep proportions realistic.
+- Use accurate perspective.
+- Use natural lighting and shadows.
+- Create strong depth and composition.
+- Make the environment match the request.
+- Preserve requested colors.
+- Preserve requested clothing.
+- Preserve requested characters.
+- Preserve requested objects.
+- Preserve requested location.
+- Preserve requested weather.
+- Preserve requested time of day.
+- Preserve requested camera angle.
+- Preserve requested artistic style.
+
+QUALITY:
+
+- highly detailed
+- sharp subject
+- clean composition
+- realistic textures
+- coherent background
+- professional lighting
+- correct anatomy
+- no duplicated objects
+- no distorted faces
+- no extra limbs
+- no extra fingers
+- no random objects
+- no random text
+- no watermark
+
+The final image should closely match the user's original request.
+`.trim();
+}
 
 
+// ===============================
+// GENERATE IMAGE
+// ===============================
 
+async function generateImage(idea) {
 
+    const prompt =
+        buildImagePrompt(idea);
 
+    const url =
+        "https://image.pollinations.ai/prompt/" +
+        encodeURIComponent(prompt) +
+        "?width=1024&height=1024&nologo=true";
 
+    const image =
+        document.createElement("img");
 
-    if(sender==="user"){
+    image.src = url;
 
+    image.style.maxWidth = "100%";
+    image.style.borderRadius = "15px";
+    image.style.marginTop = "10px";
 
-        row.appendChild(bubble);
-
-        row.appendChild(avatar);
-
-
-    }
-
-    else{
-
-
-        row.appendChild(avatar);
-
-        row.appendChild(bubble);
-
-
-    }
-
-
-
-
-
-    chatBox.appendChild(row);
-
+    chatBox.appendChild(image);
 
     chatBox.scrollTop =
         chatBox.scrollHeight;
 
-
-
+    return url;
 }
 
 
+// ===============================
+// SEND MESSAGE
+// ===============================
 
-
-
-
-messages.forEach(msg=>{
-
-
-    createMessage(
-        msg.text,
-        msg.sender
-    );
-
-
-});
-
-
-
-loadHistory();
-
-
-
-updateTitle(currentTitle);
-
-
-
-
-
-
-
-
-async function sendMessage(){
-
+async function sendMessage(fromVoice = false) {
 
     const message =
         userInput.value.trim();
 
+    if (!message) {
 
-
-    if(!message) return;
-
-
-
-
-
-    if(messages.length === 0){
-
-
-        const title =
-            generateTitle(message);
-
-
-
-        updateTitle(title);
-
-
-
-        chatTitles.push(title);
-
-
-        saveTitles();
-
-
-        addToHistory(title);
-
-
+        return;
 
     }
 
 
+    // Clear input
+    userInput.value = "";
 
 
-
-
-
-    createMessage(
+    // Show user message
+    addMessage(
         message,
         "user"
     );
 
+    saveMessage(
+        "user",
+        message
+    );
 
 
-    messages.push({
+    // Image generation
+    if (isImageRequest(message)) {
 
-        text:message,
+        showStatus("🎨 Creating your image...");
 
-        sender:"user"
-
-    });
-
-
-
-    saveChat();
-
-
-
-
-    userInput.value="";
-
-
-
-
-
-    const row =
-        document.createElement("div");
-
-
-    row.className="bot-row";
-
-
-
-    const avatar =
-        document.createElement("div");
-
-
-
-    avatar.className="avatar";
-
-
-    avatar.textContent="🤖";
-
-
-
-
-
-    const thinking =
-        document.createElement("div");
-
-
-
-    thinking.className="bot-message";
-
-
-
-    thinking.innerHTML=`
-
-        <div class="typing">
-
-            <span></span>
-
-            <span></span>
-
-            <span></span>
-
-        </div>
-
-    `;
-
-
-
-    row.appendChild(avatar);
-
-    row.appendChild(thinking);
-
-
-
-    chatBox.appendChild(row);
         try {
 
+            await generateImage(message);
 
-        const response = await fetch("/chat", {
+            saveMessage(
+                "bot",
+                "[Image generated]"
+            );
 
-            method:"POST",
+        } catch (error) {
 
-            headers:{
+            console.error(
+                "Image error:",
+                error
+            );
 
-                "Content-Type":"application/json"
+            addMessage(
+                "Sorry, I couldn't generate the image.",
+                "bot"
+            );
 
-            },
+        }
 
-            body:JSON.stringify({
-
-                message
-
-            })
-
-        });
+        return;
+    }
 
 
+    // Disable send button
+    sendBtn.disabled = true;
 
+    sendBtn.textContent =
+        "Thinking...";
+
+
+    try {
+
+        console.log(
+            "📤 Sending message to NikAI:",
+            message
+        );
+
+
+        const response =
+            await fetch(
+                "/chat",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+
+                        message: message,
+
+                        chatId:
+                            currentChatId
+
+                    })
+                }
+            );
+
+
+        console.log(
+            "📥 Server status:",
+            response.status
+        );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Server returned " +
+                response.status
+            );
+
+        }
 
 
         const data =
             await response.json();
 
 
-
-
-
-        row.remove();
-
-
-
-
-
-        createMessage(
-
-            data.reply,
-
-            "bot"
-
+        console.log(
+            "🤖 NikAI reply:",
+            data.reply
         );
 
 
+        const reply =
+            data.reply ||
+            "I didn't receive a reply.";
 
 
-
-        messages.push({
-
-            text:data.reply,
-
-            sender:"bot"
-
-        });
-
-
-
-
-
-        saveChat();
-
-
-
-
-    }
-
-    catch(error){
-
-
-        row.remove();
-
-
-
-        createMessage(
-
-            "❌ Error contacting NikAI.",
-
+        addMessage(
+            reply,
             "bot"
-
         );
 
 
+        saveMessage(
+            "bot",
+            reply
+        );
+
+
+        // IMPORTANT:
+        // Only voice messages are spoken.
+        // Normal typed messages stay silent.
+
+        if (
+            fromVoice &&
+            voiceMode
+        ) {
+
+            speakResponse(reply);
+
+        }
+
+
+    } catch (error) {
+
+        console.error(
+            "❌ Chat error:",
+            error
+        );
+
+
+        addMessage(
+            "❌ I couldn't connect to NikAI. Please check that the backend is running.",
+            "bot"
+        );
+
+
+        if (fromVoice) {
+
+            voiceMode = false;
+
+        }
+
+    } finally {
+
+        sendBtn.disabled = false;
+
+        sendBtn.textContent =
+            "Send";
+
     }
-
-
 
 }
 
 
-
-
-
-
-
-
-sendBtn.onclick = sendMessage;
-
-
-
-
-
+// ===============================
+// ENTER KEY
+// ===============================
 
 userInput.addEventListener(
     "keydown",
-    (e)=>{
+    event => {
 
+        if (
+            event.key === "Enter"
+        ) {
 
-        if(e.key==="Enter"){
+            event.preventDefault();
 
-
-            sendMessage();
-
+            sendMessage(false);
 
         }
-
 
     }
 );
 
 
+// ===============================
+// SEND BUTTON
+// ===============================
 
+sendBtn.addEventListener(
+    "click",
+    () => {
 
-
-
-
-
-
-// NEW CHAT BUTTON
-
-
-newChatBtn.onclick = ()=>{
-
-
-    if(confirm("Start a new chat?")){
-
-
-        messages=[];
-
-
-        saveChat();
-
-
-
-        chatBox.innerHTML="";
-
-
-
-        updateTitle("NikAI");
-
-
-
-        createMessage(
-
-            "👋 Hello! I am NikAI. How can I help you today?",
-
-            "bot"
-
-        );
-
+        sendMessage(false);
 
     }
+);
 
 
-};
-
-
-
-
-
-
-
-
-
-// 🎙️ VOICE INPUT
-
+// ===============================
+// VOICE RECOGNITION
+// ===============================
 
 const SpeechRecognition =
     window.SpeechRecognition ||
     window.webkitSpeechRecognition;
 
 
+if (!SpeechRecognition) {
 
+    console.error(
+        "Speech recognition is not supported."
+    );
 
+    micBtn.onclick = () => {
 
-if(SpeechRecognition && micBtn){
+        showStatus(
+            "❌ Voice recognition is not supported in this browser."
+        );
 
+    };
 
+} else {
 
-    const recognition =
+    recognition =
         new SpeechRecognition();
 
 
+    recognition.continuous =
+        false;
 
 
-    recognition.lang="en-US";
+    recognition.interimResults =
+        false;
 
 
-    recognition.continuous=false;
+    recognition.lang =
+        "en-IN";
 
 
+    // ===========================
+    // VOICE START
+    // ===========================
 
+    recognition.onstart = () => {
 
+        listening = true;
 
-    micBtn.onclick=()=>{
+        micBtn.textContent =
+            "🔴";
 
-
-        recognition.start();
-
-
-        micBtn.textContent="🔴";
-
-
-    };
-
-
-
-
-
-
-    recognition.onresult=(event)=>{
-
-
-        const voiceText =
-            event.results[0][0].transcript;
-
-
-
-        userInput.value=voiceText;
-
-
-
-        micBtn.textContent="🎙️";
-
-
-    };
-
-
-
-
-
-
-    recognition.onerror=()=>{
-
-
-        micBtn.textContent="🎙️";
-
-
-    };
-
-
-
-}
-
-else{
-
-
-    console.log(
-        "Voice recognition not supported"
-    );
-
-
-}
-
-
-
-
-
-
-
-
-
-// 📎 PDF UPLOAD
-
-
-uploadPdfBtn.onclick = async()=>{
-
-
-    const file =
-        pdfFile.files[0];
-
-
-
-    if(!file){
-
-
-        alert(
-            "Please select a PDF first."
+        showStatus(
+            "🎤 Listening..."
         );
 
+        console.log(
+            "🎤 Voice listening started"
+        );
 
-        return;
-
-
-    }
-
-
+    };
 
 
+    // ===========================
+    // VOICE RESULT
+    // ===========================
+
+    recognition.onresult =
+        async event => {
+
+            try {
+
+                const result =
+                    event.results[
+                        event.results.length - 1
+                    ];
 
 
-    const formData =
-        new FormData();
+                const text =
+                    result[0]
+                        .transcript
+                        .trim();
 
 
+                console.log(
+                    "🎤 You said:",
+                    text
+                );
 
 
+                if (!text) {
 
-    formData.append(
-        "pdf",
-        file
-    );
-
-
-
-
-
-
-
-    createMessage(
-
-        "📎 Uploading PDF...",
-
-        "user"
-
-    );
-
-
-
-
-
-
-
-    try{
-
-
-        const response =
-            await fetch(
-                "/upload-pdf",
-                {
-
-                    method:"POST",
-
-                    body:formData
+                    return;
 
                 }
 
-            );
+
+                listening = false;
 
 
+                userInput.value =
+                    text;
 
 
+                // THIS IS THE IMPORTANT PART
+                // It actually sends the voice
+                // message to /chat.
 
-        const data =
-            await response.json();
-
-
-
-
+                await sendMessage(true);
 
 
-        if(data.success){
+            } catch (error) {
+
+                console.error(
+                    "❌ Voice result error:",
+                    error
+                );
+
+            }
+
+        };
 
 
+    // ===========================
+    // VOICE END
+    // ===========================
 
-            createMessage(
+    recognition.onend = () => {
 
+        listening = false;
 
-`✅ ${data.filename} loaded!
-
-📚 NikAI has learned this document.
-
-You can now ask questions about this PDF.`,
-
-                "bot"
-
-            );
+        micBtn.textContent =
+            "🎙️";
 
 
-
-        }
-
-        else{
-
-
-
-            createMessage(
-
-                "❌ PDF upload failed.",
-
-                "bot"
-
-            );
-
-
-        }
-
-
-
-    }
-
-
-
-    catch(error){
-
-
-
-        console.error(error);
-
-
-
-
-        createMessage(
-
-            "❌ Error uploading PDF.",
-
-            "bot"
-
+        console.log(
+            "🎤 Voice listening ended"
         );
 
 
+        // If voice mode is still active
+        // and NikAI isn't speaking,
+        // listen again.
+
+        if (
+            voiceMode &&
+            !speaking
+        ) {
+
+            setTimeout(
+                startListening,
+                500
+            );
+
+        }
+
+    };
+
+
+    // ===========================
+    // VOICE ERROR
+    // ===========================
+
+    recognition.onerror =
+        event => {
+
+            console.error(
+                "❌ Voice error:",
+                event.error
+            );
+
+
+            listening = false;
+
+            micBtn.textContent =
+                "🎙️";
+
+
+            if (
+                event.error ===
+                "not-allowed"
+            ) {
+
+                voiceMode = false;
+
+                showStatus(
+                    "❌ Microphone permission denied. Allow microphone access in Chrome."
+                );
+
+            }
+
+            else if (
+                event.error ===
+                "audio-capture"
+            ) {
+
+                voiceMode = false;
+
+                showStatus(
+                    "❌ No microphone was detected."
+                );
+
+            }
+
+            else if (
+                event.error ===
+                "network"
+            ) {
+
+                voiceMode = false;
+
+                showStatus(
+                    "❌ Voice recognition network error."
+                );
+
+            }
+
+            else if (
+                event.error ===
+                "service-not-allowed"
+            ) {
+
+                voiceMode = false;
+
+                showStatus(
+                    "❌ Voice recognition service is unavailable."
+                );
+
+            }
+
+            else if (
+                event.error !==
+                "aborted" &&
+                event.error !==
+                "no-speech"
+            ) {
+
+                showStatus(
+                    "❌ Voice error: " +
+                    event.error
+                );
+
+            }
+
+        };
+
+}
+
+
+// ===============================
+// START LISTENING
+// ===============================
+
+function startListening() {
+
+    if (
+        !recognition ||
+        !voiceMode ||
+        speaking ||
+        listening
+    ) {
+
+        return;
+
     }
 
 
-};
+    try {
+
+        recognition.start();
+
+    } catch (error) {
+
+        console.log(
+            "Recognition start skipped:",
+            error.message
+        );
+
+    }
+
+}
+
+
+// ===============================
+// STOP VOICE
+// ===============================
+
+function stopVoice() {
+
+    voiceMode = false;
+
+    listening = false;
+
+    speaking = false;
+
+
+    if (recognition) {
+
+        try {
+
+            recognition.stop();
+
+        } catch {}
+
+    }
+
+
+    speechSynthesis.cancel();
+
+
+    micBtn.textContent =
+        "🎙️";
+
+
+    showStatus(
+        "🔇 Voice chat stopped"
+    );
+
+}
+
+
+// ===============================
+// SPEAK NIKAI RESPONSE
+// ===============================
+
+function speakResponse(text) {
+
+    if (
+        !voiceMode
+    ) {
+
+        return;
+
+    }
+
+
+    speechSynthesis.cancel();
+
+
+    const utterance =
+        new SpeechSynthesisUtterance(
+            text
+        );
+
+
+    utterance.lang =
+        "en-IN";
+
+
+    utterance.rate =
+        1;
+
+
+    utterance.pitch =
+        1;
+
+
+    speaking = true;
+
+
+    micBtn.textContent =
+        "⏹️";
+
+
+    showStatus(
+        "🔊 NikAI is speaking..."
+    );
+
+
+    utterance.onend = () => {
+
+        speaking = false;
+
+        micBtn.textContent =
+            "🎙️";
+
+
+        if (voiceMode) {
+
+            setTimeout(
+                startListening,
+                300
+            );
+
+        }
+
+    };
+
+
+    utterance.onerror = () => {
+
+        speaking = false;
+
+        micBtn.textContent =
+            "🎙️";
+
+    };
+
+
+    speechSynthesis.speak(
+        utterance
+    );
+
+}
+
+
+// ===============================
+// MIC BUTTON
+// ===============================
+
+micBtn.addEventListener(
+    "click",
+    () => {
+
+        // If NikAI is speaking,
+        // stop speaking and listen.
+
+        if (speaking) {
+
+            speechSynthesis.cancel();
+
+            speaking = false;
+
+            micBtn.textContent =
+                "🎙️";
+
+
+            setTimeout(
+                startListening,
+                200
+            );
+
+            return;
+
+        }
+
+
+        // If currently listening,
+        // stop voice mode.
+
+        if (listening) {
+
+            stopVoice();
+
+            return;
+
+        }
+
+
+        // Start voice mode.
+
+        voiceMode = true;
+
+        showStatus(
+            "🎤 Starting voice chat..."
+        );
+
+        startListening();
+
+    }
+);
+
+
+// ===============================
+// NEW CHAT
+// ===============================
+
+newChatBtn.addEventListener(
+    "click",
+    () => {
+
+        createNewChat();
+
+    }
+);
+
+
+// ===============================
+// PDF UPLOAD
+// ===============================
+
+uploadPdf.addEventListener(
+    "click",
+    async () => {
+
+        const file =
+            pdfFile.files[0];
+
+
+        if (!file) {
+
+            showStatus(
+                "📄 Please choose a PDF first."
+            );
+
+            return;
+
+        }
+
+
+        const formData =
+            new FormData();
+
+
+        formData.append(
+            "pdf",
+            file
+        );
+
+
+        uploadPdf.disabled =
+            true;
+
+
+        uploadPdf.textContent =
+            "Learning...";
+
+
+        try {
+
+            const response =
+                await fetch(
+                    "/upload-pdf",
+                    {
+                        method: "POST",
+                        body: formData
+                    }
+                );
+
+
+            const data =
+                await response.json();
+
+
+            if (
+                data.success
+            ) {
+
+                showStatus(
+                    "✅ PDF learned successfully!"
+                );
+
+            } else {
+
+                showStatus(
+                    "❌ " +
+                    (
+                        data.message ||
+                        "PDF upload failed."
+                    )
+                );
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "PDF error:",
+                error
+            );
+
+            showStatus(
+                "❌ Could not upload PDF."
+            );
+
+        } finally {
+
+            uploadPdf.disabled =
+                false;
+
+            uploadPdf.textContent =
+                "📎 Upload PDF";
+
+        }
+
+    }
+);
+
+
+// ===============================
+// INITIAL CHAT
+// ===============================
+
+if (
+    Object.keys(chats).length === 0
+) {
+
+    createNewChat();
+
+} else {
+
+    if (
+        !chats[currentChatId]
+    ) {
+
+        currentChatId =
+            Object.keys(chats)[0];
+
+    }
+
+    renderChat();
+
+    renderHistory();
+
+}
