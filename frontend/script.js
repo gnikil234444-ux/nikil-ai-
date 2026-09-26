@@ -116,18 +116,81 @@ function addMessage(text, sender) {
             ? "message user-message"
             : "message bot-message";
 
-    if (sender === "bot" && typeof marked !== "undefined") {
+
+    // BOT MESSAGE
+    if (
+        sender === "bot" &&
+        typeof marked !== "undefined"
+    ) {
 
         message.innerHTML =
             marked.parse(text);
 
-    } else {
 
-        message.textContent = text;
+        // COPY BUTTON
+        const copyButton =
+            document.createElement("button");
+
+        copyButton.textContent =
+            "📋 Copy";
+
+        copyButton.className =
+            "copy-btn";
+
+
+        copyButton.onclick =
+            async () => {
+
+                try {
+
+                    await navigator.clipboard.writeText(
+                        text
+                    );
+
+                    copyButton.textContent =
+                        "✅ Copied!";
+
+                    setTimeout(() => {
+
+                        copyButton.textContent =
+                            "📋 Copy";
+
+                    }, 1500);
+
+                } catch (error) {
+
+                    console.error(
+                        "Copy failed:",
+                        error
+                    );
+
+                    showStatus(
+                        "❌ Could not copy text."
+                    );
+
+                }
+
+            };
+
+
+        message.appendChild(
+            copyButton
+        );
 
     }
 
-    chatBox.appendChild(message);
+    // USER MESSAGE
+    else {
+
+        message.textContent =
+            text;
+
+    }
+
+
+    chatBox.appendChild(
+        message
+    );
 
     chatBox.scrollTop =
         chatBox.scrollHeight;
@@ -143,14 +206,19 @@ function createNewChat() {
     currentChatId =
         "chat-" + Date.now();
 
+
     chats[currentChatId] = [
         {
             sender: "bot",
-            text: "Hello! I am NikAI. How can I help you?"
+            text:
+                "Hello! I am NikAI. How can I help you?"
         }
     ];
 
-    titles[currentChatId] = "New Chat";
+
+    titles[currentChatId] =
+        "New Chat";
+
 
     saveChats();
 
@@ -168,8 +236,10 @@ function renderChat() {
 
     chatBox.innerHTML = "";
 
+
     const messages =
         chats[currentChatId] || [];
+
 
     for (const message of messages) {
 
@@ -179,6 +249,7 @@ function renderChat() {
         );
 
     }
+
 
     chatTitle.textContent =
         titles[currentChatId] || "NikAI";
@@ -193,26 +264,37 @@ function renderHistory() {
 
     chatHistory.innerHTML = "";
 
+
     for (const id in chats) {
 
         const item =
             document.createElement("div");
 
-        item.className = "history-item";
+
+        item.className =
+            "history-item";
+
 
         item.textContent =
             titles[id] || "New Chat";
 
+
         item.onclick = () => {
 
-            currentChatId = id;
+            currentChatId =
+                id;
 
             renderChat();
 
         };
 
-        chatHistory.appendChild(item);
+
+        chatHistory.appendChild(
+            item
+        );
+
     }
+
 }
 
 
@@ -228,10 +310,32 @@ function saveMessage(sender, text) {
 
     }
 
-    chats[currentChatId].push({
+
+    // PREVENT DUPLICATE MESSAGE
+    const messages =
+        chats[currentChatId];
+
+
+    const lastMessage =
+        messages[messages.length - 1];
+
+
+    if (
+        lastMessage &&
+        lastMessage.sender === sender &&
+        lastMessage.text === text
+    ) {
+
+        return;
+
+    }
+
+
+    messages.push({
         sender,
         text
     });
+
 
     saveChats();
 }
@@ -246,6 +350,7 @@ function isImageRequest(text) {
     const lower =
         text.toLowerCase();
 
+
     return (
         lower.includes("generate an image") ||
         lower.includes("create an image") ||
@@ -255,6 +360,7 @@ function isImageRequest(text) {
         lower.includes("create a picture") ||
         lower.startsWith("draw ")
     );
+
 }
 
 
@@ -308,6 +414,7 @@ QUALITY:
 
 The final image should closely match the user's original request.
 `.trim();
+
 }
 
 
@@ -320,24 +427,39 @@ async function generateImage(idea) {
     const prompt =
         buildImagePrompt(idea);
 
+
     const url =
         "https://image.pollinations.ai/prompt/" +
         encodeURIComponent(prompt) +
         "?width=1024&height=1024&nologo=true";
 
+
     const image =
         document.createElement("img");
 
-    image.src = url;
 
-    image.style.maxWidth = "100%";
-    image.style.borderRadius = "15px";
-    image.style.marginTop = "10px";
+    image.src =
+        url;
 
-    chatBox.appendChild(image);
+
+    image.style.maxWidth =
+        "100%";
+
+    image.style.borderRadius =
+        "15px";
+
+    image.style.marginTop =
+        "10px";
+
+
+    chatBox.appendChild(
+        image
+    );
+
 
     chatBox.scrollTop =
         chatBox.scrollHeight;
+
 
     return url;
 }
@@ -351,6 +473,7 @@ async function sendMessage(fromVoice = false) {
 
     const message =
         userInput.value.trim();
+
 
     if (!message) {
 
@@ -369,25 +492,39 @@ async function sendMessage(fromVoice = false) {
         "user"
     );
 
+
+    // Save user message
     saveMessage(
         "user",
         message
     );
 
 
-    // Image generation
-    if (isImageRequest(message)) {
+    // ===========================
+    // IMAGE GENERATION
+    // ===========================
 
-        showStatus("🎨 Creating your image...");
+    if (
+        isImageRequest(message)
+    ) {
+
+        showStatus(
+            "🎨 Creating your image..."
+        );
+
 
         try {
 
-            await generateImage(message);
+            await generateImage(
+                message
+            );
+
 
             saveMessage(
                 "bot",
                 "[Image generated]"
             );
+
 
         } catch (error) {
 
@@ -396,6 +533,7 @@ async function sendMessage(fromVoice = false) {
                 error
             );
 
+
             addMessage(
                 "Sorry, I couldn't generate the image.",
                 "bot"
@@ -403,12 +541,19 @@ async function sendMessage(fromVoice = false) {
 
         }
 
+
         return;
+
     }
 
 
-    // Disable send button
-    sendBtn.disabled = true;
+    // ===========================
+    // DISABLE SEND BUTTON
+    // ===========================
+
+    sendBtn.disabled =
+        true;
+
 
     sendBtn.textContent =
         "Thinking...";
@@ -435,12 +580,14 @@ async function sendMessage(fromVoice = false) {
 
                     body: JSON.stringify({
 
-                        message: message,
+                        message:
+                            message,
 
                         chatId:
                             currentChatId
 
                     })
+
                 }
             );
 
@@ -476,28 +623,32 @@ async function sendMessage(fromVoice = false) {
             "I didn't receive a reply.";
 
 
+        // Show bot reply
         addMessage(
             reply,
             "bot"
         );
 
 
+        // Save bot reply
         saveMessage(
             "bot",
             reply
         );
 
 
-        // IMPORTANT:
-        // Only voice messages are spoken.
-        // Normal typed messages stay silent.
+        // ===========================
+        // VOICE RESPONSE
+        // ===========================
 
         if (
             fromVoice &&
             voiceMode
         ) {
 
-            speakResponse(reply);
+            speakResponse(
+                reply
+            );
 
         }
 
@@ -518,13 +669,16 @@ async function sendMessage(fromVoice = false) {
 
         if (fromVoice) {
 
-            voiceMode = false;
+            voiceMode =
+                false;
 
         }
 
     } finally {
 
-        sendBtn.disabled = false;
+        sendBtn.disabled =
+            false;
+
 
         sendBtn.textContent =
             "Send";
@@ -548,7 +702,9 @@ userInput.addEventListener(
 
             event.preventDefault();
 
-            sendMessage(false);
+            sendMessage(
+                false
+            );
 
         }
 
@@ -564,7 +720,9 @@ sendBtn.addEventListener(
     "click",
     () => {
 
-        sendMessage(false);
+        sendMessage(
+            false
+        );
 
     }
 );
@@ -584,6 +742,7 @@ if (!SpeechRecognition) {
     console.error(
         "Speech recognition is not supported."
     );
+
 
     micBtn.onclick = () => {
 
@@ -615,22 +774,27 @@ if (!SpeechRecognition) {
     // VOICE START
     // ===========================
 
-    recognition.onstart = () => {
+    recognition.onstart =
+        () => {
 
-        listening = true;
+            listening =
+                true;
 
-        micBtn.textContent =
-            "🔴";
 
-        showStatus(
-            "🎤 Listening..."
-        );
+            micBtn.textContent =
+                "🔴";
 
-        console.log(
-            "🎤 Voice listening started"
-        );
 
-    };
+            showStatus(
+                "🎤 Listening..."
+            );
+
+
+            console.log(
+                "🎤 Voice listening started"
+            );
+
+        };
 
 
     // ===========================
@@ -667,18 +831,17 @@ if (!SpeechRecognition) {
                 }
 
 
-                listening = false;
+                listening =
+                    false;
 
 
                 userInput.value =
                     text;
 
 
-                // THIS IS THE IMPORTANT PART
-                // It actually sends the voice
-                // message to /chat.
-
-                await sendMessage(true);
+                await sendMessage(
+                    true
+                );
 
 
             } catch (error) {
@@ -697,36 +860,35 @@ if (!SpeechRecognition) {
     // VOICE END
     // ===========================
 
-    recognition.onend = () => {
+    recognition.onend =
+        () => {
 
-        listening = false;
-
-        micBtn.textContent =
-            "🎙️";
-
-
-        console.log(
-            "🎤 Voice listening ended"
-        );
+            listening =
+                false;
 
 
-        // If voice mode is still active
-        // and NikAI isn't speaking,
-        // listen again.
+            micBtn.textContent =
+                "🎙️";
 
-        if (
-            voiceMode &&
-            !speaking
-        ) {
 
-            setTimeout(
-                startListening,
-                500
+            console.log(
+                "🎤 Voice listening ended"
             );
 
-        }
 
-    };
+            if (
+                voiceMode &&
+                !speaking
+            ) {
+
+                setTimeout(
+                    startListening,
+                    500
+                );
+
+            }
+
+        };
 
 
     // ===========================
@@ -742,7 +904,9 @@ if (!SpeechRecognition) {
             );
 
 
-            listening = false;
+            listening =
+                false;
+
 
             micBtn.textContent =
                 "🎙️";
@@ -753,7 +917,9 @@ if (!SpeechRecognition) {
                 "not-allowed"
             ) {
 
-                voiceMode = false;
+                voiceMode =
+                    false;
+
 
                 showStatus(
                     "❌ Microphone permission denied. Allow microphone access in Chrome."
@@ -766,7 +932,9 @@ if (!SpeechRecognition) {
                 "audio-capture"
             ) {
 
-                voiceMode = false;
+                voiceMode =
+                    false;
+
 
                 showStatus(
                     "❌ No microphone was detected."
@@ -779,7 +947,9 @@ if (!SpeechRecognition) {
                 "network"
             ) {
 
-                voiceMode = false;
+                voiceMode =
+                    false;
+
 
                 showStatus(
                     "❌ Voice recognition network error."
@@ -792,7 +962,9 @@ if (!SpeechRecognition) {
                 "service-not-allowed"
             ) {
 
-                voiceMode = false;
+                voiceMode =
+                    false;
+
 
                 showStatus(
                     "❌ Voice recognition service is unavailable."
@@ -859,11 +1031,16 @@ function startListening() {
 
 function stopVoice() {
 
-    voiceMode = false;
+    voiceMode =
+        false;
 
-    listening = false;
 
-    speaking = false;
+    listening =
+        false;
+
+
+    speaking =
+        false;
 
 
     if (recognition) {
@@ -927,7 +1104,8 @@ function speakResponse(text) {
         1;
 
 
-    speaking = true;
+    speaking =
+        true;
 
 
     micBtn.textContent =
@@ -939,34 +1117,42 @@ function speakResponse(text) {
     );
 
 
-    utterance.onend = () => {
+    utterance.onend =
+        () => {
 
-        speaking = false;
-
-        micBtn.textContent =
-            "🎙️";
-
-
-        if (voiceMode) {
-
-            setTimeout(
-                startListening,
-                300
-            );
-
-        }
-
-    };
+            speaking =
+                false;
 
 
-    utterance.onerror = () => {
+            micBtn.textContent =
+                "🎙️";
 
-        speaking = false;
 
-        micBtn.textContent =
-            "🎙️";
+            if (
+                voiceMode
+            ) {
 
-    };
+                setTimeout(
+                    startListening,
+                    300
+                );
+
+            }
+
+        };
+
+
+    utterance.onerror =
+        () => {
+
+            speaking =
+                false;
+
+
+            micBtn.textContent =
+                "🎙️";
+
+        };
 
 
     speechSynthesis.speak(
@@ -984,14 +1170,17 @@ micBtn.addEventListener(
     "click",
     () => {
 
-        // If NikAI is speaking,
-        // stop speaking and listen.
-
-        if (speaking) {
+        // Stop speaking and listen
+        if (
+            speaking
+        ) {
 
             speechSynthesis.cancel();
 
-            speaking = false;
+
+            speaking =
+                false;
+
 
             micBtn.textContent =
                 "🎙️";
@@ -1002,15 +1191,16 @@ micBtn.addEventListener(
                 200
             );
 
+
             return;
 
         }
 
 
-        // If currently listening,
-        // stop voice mode.
-
-        if (listening) {
+        // Stop voice mode
+        if (
+            listening
+        ) {
 
             stopVoice();
 
@@ -1019,13 +1209,15 @@ micBtn.addEventListener(
         }
 
 
-        // Start voice mode.
+        // Start voice mode
+        voiceMode =
+            true;
 
-        voiceMode = true;
 
         showStatus(
             "🎤 Starting voice chat..."
         );
+
 
         startListening();
 
@@ -1131,6 +1323,7 @@ uploadPdf.addEventListener(
                 error
             );
 
+
             showStatus(
                 "❌ Could not upload PDF."
             );
@@ -1139,6 +1332,7 @@ uploadPdf.addEventListener(
 
             uploadPdf.disabled =
                 false;
+
 
             uploadPdf.textContent =
                 "📎 Upload PDF";
@@ -1169,6 +1363,7 @@ if (
             Object.keys(chats)[0];
 
     }
+
 
     renderChat();
 
